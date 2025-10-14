@@ -1,7 +1,5 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using LfsProxy.Models;
 using Microsoft.Extensions.Options;
 
@@ -9,99 +7,69 @@ namespace LfsProxy.Services;
 
 public class JsonLockService
 {
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _fileSemaphores = new();
-    private readonly string _locksDirectory;
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> FileSemaphores = new();
     private readonly ILogger<JsonLockService> _logger;
+    private readonly string _storagePath;
 
     public JsonLockService(IOptions<LfsConfig> options, ILogger<JsonLockService> logger)
     {
+        _storagePath = options.Value.StoragePath;
         _logger = logger;
-        var configuredPath = options.Value.StoragePath;
-        if (string.IsNullOrEmpty(configuredPath))
-        {
-            var processModule = Process.GetCurrentProcess().MainModule;
-            if (processModule != null)
-            {
-                var executablePath = Path.GetDirectoryName(processModule.FileName);
-                _locksDirectory =
-                    Path.Combine(!string.IsNullOrEmpty(executablePath) ? executablePath : AppContext.BaseDirectory,
-                        "lfs-locks");
-            }
-            else
-            {
-                _locksDirectory = Path.Combine(AppContext.BaseDirectory, "lfs-locks");
-            }
-        }
-        else
-        {
-            _locksDirectory = Path.GetFullPath(configuredPath);
-        }
-
-        Directory.CreateDirectory(_locksDirectory);
-        _logger.LogInformation("JSON 锁存储目录: {Path}", _locksDirectory);
+        if (!Directory.Exists(_storagePath)) Directory.CreateDirectory(_storagePath);
     }
 
-    private string GetLockFilePath(string repository)
+    private string GetLockFilePath(string repositoryPath)
     {
-        if (!Regex.IsMatch(repository, @"^[a-zA-Z0-9_\-/]+$"))
-            throw new ArgumentException("Invalid repository name format.", nameof(repository));
-        var safeRepoFilename = repository.Replace("/", "_") + ".json";
-        return Path.Combine(_locksDirectory, safeRepoFilename);
+        var safeFileName = $"{repositoryPath.Replace('/', '_')}.json";
+        return Path.Combine(_storagePath, safeFileName);
     }
 
     private SemaphoreSlim GetSemaphoreForFile(string filePath)
     {
-        return _fileSemaphores.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
+        return FileSemaphores.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
     }
 
-    private async Task<Dictionary<string, FileLock>> ReadLocksAsync(string filePath)
+    public async Task<List<FileLock>> GetLocksByRepositoryAsync(string repositoryPath)
     {
-        if (!File.Exists(filePath)) return new Dictionary<string, FileLock>();
-        try
-        {
-            var json = await File.ReadAllTextAsync(filePath);
-            return JsonSerializer.Deserialize<Dictionary<string, FileLock>>(json)
-                   ?? new Dictionary<string, FileLock>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "读取锁文件失败: {FilePath}", filePath);
-            return new Dictionary<string, FileLock>();
-        }
-    }
+        var lockFilePath = GetLockFilePath(repositoryPath);
+        var semaphore = GetSemaphoreForFile(lockFilePath);
 
-    private async Task WriteLocksAsync(string filePath, Dictionary<string, FileLock> locks)
-    {
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        var json = JsonSerializer.Serialize(locks, options);
-        await File.WriteAllTextAsync(filePath, json);
-    }
-
-    public async Task<(FileLock? newLock, FileLock? existingLock)> CreateLockAsync(string repository, string path,
-        string ownerId, string ownerName)
-    {
-        var filePath = GetLockFilePath(repository);
-        var semaphore = GetSemaphoreForFile(filePath);
         await semaphore.WaitAsync();
         try
         {
-            var repoLocks = await ReadLocksAsync(filePath);
-            var existingLock = repoLocks.Values.FirstOrDefault(l => l.Path == path);
+            return await ReadLocksFromFileAsync(lockFilePath);
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+    }
+
+    public async Task<(FileLock? newLock, FileLock? existingLock)> CreateLockAsync(string repositoryPath, string path,
+        string ownerId, string ownerName)
+    {
+        var lockFilePath = GetLockFilePath(repositoryPath);
+        var semaphore = GetSemaphoreForFile(lockFilePath);
+
+        await semaphore.WaitAsync();
+        try
+        {
+            var locks = await ReadLocksFromFileAsync(lockFilePath);
+            var existingLock = locks.FirstOrDefault(l => l.Path == path);
 
             if (existingLock != null) return (null, existingLock);
 
             var newLock = new FileLock
             {
                 Id = Guid.NewGuid().ToString(),
-                Repository = repository,
                 Path = path,
+                LockedAt = DateTime.UtcNow,
                 OwnerId = ownerId,
-                OwnerName = ownerName,
-                LockedAt = DateTime.UtcNow
+                OwnerName = ownerName
             };
 
-            repoLocks[newLock.Id] = newLock;
-            await WriteLocksAsync(filePath, repoLocks);
+            locks.Add(newLock);
+            await WriteLocksToFileAsync(lockFilePath, locks);
 
             return (newLock, null);
         }
@@ -111,15 +79,26 @@ public class JsonLockService
         }
     }
 
-    public async Task<List<FileLock>> GetLocksByRepositoryAsync(string repository)
+    public async Task<(FileLock? unlockedLock, bool isOwner)> UnlockAsync(string repositoryPath, string lockId,
+        string ownerId)
     {
-        var filePath = GetLockFilePath(repository);
-        var semaphore = GetSemaphoreForFile(filePath);
+        var lockFilePath = GetLockFilePath(repositoryPath);
+        var semaphore = GetSemaphoreForFile(lockFilePath);
+
         await semaphore.WaitAsync();
         try
         {
-            var repoLocks = await ReadLocksAsync(filePath);
-            return repoLocks.Values.ToList();
+            var locks = await ReadLocksFromFileAsync(lockFilePath);
+            var lockToUnlock = locks.FirstOrDefault(l => l.Id == lockId);
+
+            if (lockToUnlock == null) return (null, false);
+
+            if (lockToUnlock.OwnerId != ownerId) return (lockToUnlock, false);
+
+            locks.Remove(lockToUnlock);
+            await WriteLocksToFileAsync(lockFilePath, locks);
+
+            return (lockToUnlock, true);
         }
         finally
         {
@@ -127,28 +106,26 @@ public class JsonLockService
         }
     }
 
-    public async Task<(FileLock? unlockedLock, bool isOwner)> UnlockAsync(string repository, string id, string ownerId)
+    private async Task<List<FileLock>> ReadLocksFromFileAsync(string filePath)
     {
-        var filePath = GetLockFilePath(repository);
-        var semaphore = GetSemaphoreForFile(filePath);
-        await semaphore.WaitAsync();
+        if (!File.Exists(filePath)) return [];
+
         try
         {
-            var repoLocks = await ReadLocksAsync(filePath);
-            if (repoLocks.TryGetValue(id, out var fileLock))
-            {
-                if (fileLock.OwnerId != ownerId) return (fileLock, false); // 不是所有者
-
-                repoLocks.Remove(id);
-                await WriteLocksAsync(filePath, repoLocks);
-                return (fileLock, true); // 成功解锁
-            }
-
-            return (null, false); // 找不到锁
+            var json = await File.ReadAllTextAsync(filePath);
+            return JsonSerializer.Deserialize<List<FileLock>>(json) ?? new List<FileLock>();
         }
-        finally
+        catch (Exception ex)
         {
-            semaphore.Release();
+            _logger.LogError(ex, "无法读取或反序列化锁文件: {FilePath}", filePath);
+            return [];
         }
+    }
+
+    private static async Task WriteLocksToFileAsync(string filePath, List<FileLock> locks)
+    {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        var json = JsonSerializer.Serialize(locks, options);
+        await File.WriteAllTextAsync(filePath, json);
     }
 }
