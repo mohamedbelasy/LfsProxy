@@ -1,6 +1,7 @@
 using LfsProxy.Middleware;
 using LfsProxy.Models;
 using LfsProxy.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using Minio;
 
@@ -39,6 +40,13 @@ builder.Services.AddSingleton<IMinioClient>(sp =>
     return client.Build();
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownProxies.Clear();
+    options.KnownNetworks.Clear();
+});
+
 builder.Services.AddScoped<MinioService>();
 
 builder.Services.AddSingleton<JsonLockService>();
@@ -47,6 +55,8 @@ builder.Services.AddSingleton<JsonLockService>();
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));*/
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 var basePath = app.Configuration.GetValue<string>("BasePath");
 
@@ -58,7 +68,7 @@ if (!string.IsNullOrEmpty(basePath))
         if (!context.Request.PathBase.HasValue && context.Request.Path != "/")
         {
             context.Response.StatusCode = 404;
-            Console.WriteLine($"--> [DEBUG] 拒绝不带BasePath的请求: {context.Request.Path}");
+            // Console.WriteLine($"--> [DEBUG] 拒绝不带BasePath的请求: {context.Request.Path}");
             return;
         }
 
